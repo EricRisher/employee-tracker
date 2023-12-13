@@ -4,3 +4,7 @@ CREATE DATABASE employees_db;
 USE employees_db;
 
 SELECT * FROM employee;
+
+SELECT * FROM department;
+
+DROP TABLE department;

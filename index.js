@@ -117,8 +117,17 @@ const updateEmployeeRole = async () => {
 
 const viewAllRoles = async () => {
   try {
-    const roles = await db.query("SELECT * FROM role");
-    console.table(roles);
+    const [roles] = await db.query("SELECT * FROM role");
+    const formattedRoles = roles.map((role) => {
+      return {
+        ID: role.id,
+        Title: role.title,
+        Salary: role.salary,
+        Department_ID: role.department_id,
+      };
+    });
+
+    console.table(formattedRoles);
     start();
   } catch (error) {
     console.log(error);
@@ -126,9 +135,11 @@ const viewAllRoles = async () => {
   }
 };
 
-const addRole = () => {
-  inquirer
-    .prompt([
+const addRole = async () => {
+  try {
+    const departments = await db.query("SELECT * FROM department");
+
+    const answers = await inquirer.prompt([
       {
         type: "input",
         name: "title",
@@ -144,29 +155,17 @@ const addRole = () => {
         name: "department_id",
         message: "Enter role department ID:",
       },
-    ])
-    .then(async (answers) => {
-      try {
-        await db.query(
-          "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)",
-          {
-            replacements: [answers.title, answers.salary, answers.department_id],
-            type: db.QueryTypes.INSERT,
-          }
-        );
-        console.log("Role added!");
-        start();
-      } catch (error) {
-        console.log(error);
-        start();
-      }
-    });
-};
+    ]);
 
-const viewAllDepartments = async () => {
-  try {
-    const departments = await db.query("SELECT * FROM department");
-    console.table(departments);
+    await db.query(
+      "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)",
+      {
+        replacements: [answers.title, answers.salary, answers.department_id],
+        type: db.QueryTypes.INSERT,
+      }
+    );
+
+    console.log("Role added!");
     start();
   } catch (error) {
     console.log(error);
@@ -174,28 +173,67 @@ const viewAllDepartments = async () => {
   }
 };
 
-const addDepartment = () => {
-  inquirer
-    .prompt([
-      {
-        type: "input",
-        name: "name",
-        message: "Enter department name:",
-      },
-    ])
-    .then(async (answers) => {
-      try {
-        await db.query("INSERT INTO department (name) VALUES (?)", {
-          replacements: [answers.name],
-          type: db.QueryTypes.INSERT,
-        });
-        console.log("Department added!");
-        start();
-      } catch (error) {
-        console.log(error);
-        start();
-      }
+const viewAllDepartments = async () => {
+  try {
+    const [departments, metadata] = await db.query("SELECT * FROM department");
+
+    // Remove duplicates based on the 'id' field
+    const uniqueDepartments = Array.from(
+      new Set(departments.map((d) => d.id))
+    ).map((id) => {
+      return departments.find((d) => d.id === id);
     });
+
+    console.table(uniqueDepartments);
+    start();
+  } catch (error) {
+    console.log(error);
+    start();
+  }
+};
+
+const addDepartment = async () => {
+  try {
+    const [existingDepartments, metadata] = await db.query(
+      "SELECT * FROM department"
+    );
+
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          name: "name",
+          message: "Enter department name:",
+        },
+      ])
+      .then(async (answers) => {
+        try {
+          // Check if the department with the same name already exists
+          const departmentExists = existingDepartments.some(
+            (dep) => dep.name === answers.name
+          );
+
+          if (departmentExists) {
+            console.log("Department with the same name already exists");
+            return start();
+          }
+
+          await db.query("INSERT INTO department (name) VALUES (?)", {
+            replacements: [answers.name],
+            type: db.QueryTypes.INSERT,
+          });
+
+          console.log("Department added!");
+          start();
+        } catch (error) {
+          console.log(error);
+          start();
+        }
+      });
+  } catch (error) {
+    console.log(error);
+    start();
+  }
 };
 
 const start = () => {
