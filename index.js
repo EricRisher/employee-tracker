@@ -3,7 +3,18 @@ const db = require("./db/connection");
 
 const viewAllEmployees = async () => {
   try {
-    const employees = await db.query("SELECT * FROM employee", {
+    const query = `
+      SELECT e.id, e.first_name, e.last_name, e.role_id, e.manager_id,
+             r.title AS role_title, r.salary AS role_salary,
+             m.first_name AS manager_first_name, m.last_name AS manager_last_name,
+             d.name AS department_title
+      FROM employee e
+      LEFT JOIN employee m ON e.manager_id = m.id
+      LEFT JOIN role r ON e.role_id = r.id
+      LEFT JOIN department d ON r.department_id = d.id
+    `;
+
+    const employees = await db.query(query, {
       type: db.QueryTypes.SELECT,
     });
 
@@ -12,8 +23,10 @@ const viewAllEmployees = async () => {
         ID: employee.id,
         First_Name: employee.first_name,
         Last_Name: employee.last_name,
-        Role_ID: employee.role_id,
-        Manager_ID: employee.manager_id,
+        Title: employee.role_title,
+        Department: employee.department_title,
+        Salary: employee.role_salary,
+        Manager: `${employee.manager_first_name} ${employee.manager_last_name}`,
       };
     });
 
@@ -25,65 +38,110 @@ const viewAllEmployees = async () => {
   }
 };
 
-const addEmployee = () => {
-  inquirer
-    .prompt([
-      {
-        type: "input",
-        name: "first_name",
-        message: "Enter employee's first name:",
-      },
-      {
-        type: "input",
-        name: "last_name",
-        message: "Enter employee's last name:",
-      },
-      {
-        type: "input",
-        name: "role_id",
-        message: "Enter employee's role ID:",
-      },
-      {
-        type: "input",
-        name: "manager_id",
-        message: "Enter employee's manager ID:",
-      },
-    ])
-    .then(async (answers) => {
-      try {
-        await db.query(
-          "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
-          {
-            replacements: [
-              answers.first_name,
-              answers.last_name,
-              answers.role_id,
-              answers.manager_id,
-            ],
-            type: db.QueryTypes.INSERT, 
-          }
-        );
-        console.log("Employee added!");
-        start();
-      } catch (error) {
-        console.log(error);
-        start();
-      }
-    });
+const addEmployee = async () => {
+  try {
+    const roles = await db.query("SELECT * FROM role");
+
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          name: "first_name",
+          message: "Enter employee's first name:",
+        },
+        {
+          type: "input",
+          name: "last_name",
+          message: "Enter employee's last name:",
+        },
+        {
+          type: "list",
+          name: "role_id",
+          message: "What is the employee's role?",
+          choices: roles[0].map((role) => {
+            return {
+              name: role.title,
+              value: role.id,
+            };
+          }),
+        },
+        {
+          type: "list",
+          name: "manager_id",
+          message: "Who is the employee's manager?",
+          choices: async () => {
+            const employees = await db.query("SELECT * FROM employee");
+
+            return employees[0].map((employee) => {
+              return {
+                name: `${employee.first_name} ${employee.last_name}`,
+                value: employee.id,
+              };
+            });
+          },
+        },
+      ])
+      .then(async (answers) => {
+        try {
+          await db.query(
+            "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
+            {
+              replacements: [
+                answers.first_name,
+                answers.last_name,
+                answers.role_id,
+                answers.manager_id,
+              ],
+              type: db.QueryTypes.INSERT,
+            }
+          );
+          console.log("Employee added!");
+          start();
+        } catch (error) {
+          console.log(error);
+          start();
+        }
+      });
+  } catch (error) {
+    console.log(error);
+    start();
+  }
 };
+
 
 const updateEmployeeRole = async () => {
   inquirer
     .prompt([
       {
-        type: "input",
+        type: "list",
         name: "employee_id",
-        message: "Enter employee's ID:",
+        message: "Which employee's role would you like to update?",
+        choices: async () => {
+          const employees = await db.query("SELECT * FROM employee");
+
+          return employees[0].map((employee) => {
+            return {
+              name: `${employee.first_name} ${employee.last_name}`,
+              value: employee.id,
+            };
+          });
+        },
+
       },
       {
-        type: "input",
+        type: "list",
         name: "role_id",
-        message: "Enter employee's new role ID:",
+        message: "Which role do you want to assign to the selected employee?",
+        choices: async () => {
+          const roles = await db.query("SELECT * FROM role");
+
+          return roles[0].map((role) => {
+            return {
+              name: role.title,
+              value: role.id,
+            };
+          });
+        },
       },
     ])
     .then(async (answers) => {
@@ -117,13 +175,20 @@ const updateEmployeeRole = async () => {
 
 const viewAllRoles = async () => {
   try {
-    const [roles] = await db.query("SELECT * FROM role");
+    const query = `
+      SELECT r.id AS ID, r.title AS Title, r.salary AS Salary, d.name AS Department
+      FROM role r
+      LEFT JOIN department d ON r.department_id = d.id
+    `;
+
+    const [roles] = await db.query(query);
+
     const formattedRoles = roles.map((role) => {
       return {
-        ID: role.id,
-        Title: role.title,
-        Salary: role.salary,
-        Department_ID: role.department_id,
+        ID: role.ID,
+        Title: role.Title,
+        Salary: role.Salary,
+        Department: role.Department,
       };
     });
 
@@ -134,6 +199,7 @@ const viewAllRoles = async () => {
     start();
   }
 };
+
 
 const addRole = async () => {
   try {
@@ -151,9 +217,15 @@ const addRole = async () => {
         message: "Enter role salary:",
       },
       {
-        type: "input",
+        type: "list",
         name: "department_id",
-        message: "Enter role department ID:",
+        message: "Which department does this role belong to? (Enter department ID):",
+        choices: departments[0].map((department) => {
+          return {
+            name: department.name,
+            value: department.id,
+          };
+        }),
       },
     ]);
 
@@ -237,6 +309,7 @@ const addDepartment = async () => {
 };
 
 const start = () => {
+  console.log("Welcome to the Employee Tracker!");
   inquirer
     .prompt([
       {
