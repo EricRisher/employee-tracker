@@ -3,8 +3,21 @@ const db = require("./db/connection");
 
 const viewAllEmployees = async () => {
   try {
-    const employees = await db.query("SELECT * FROM employee");
-    console.log(employees);
+    const employees = await db.query("SELECT * FROM employee", {
+      type: db.QueryTypes.SELECT,
+    });
+
+    const formattedEmployees = employees.map((employee) => {
+      return {
+        ID: employee.id,
+        First_Name: employee.first_name,
+        Last_Name: employee.last_name,
+        Role_ID: employee.role_id,
+        Manager_ID: employee.manager_id,
+      };
+    });
+
+    console.table(formattedEmployees);
     start();
   } catch (error) {
     console.log(error);
@@ -59,7 +72,7 @@ const addEmployee = () => {
     });
 };
 
-const updateEmployeeRole = () => {
+const updateEmployeeRole = async () => {
   inquirer
     .prompt([
       {
@@ -75,14 +88,25 @@ const updateEmployeeRole = () => {
     ])
     .then(async (answers) => {
       try {
-        await db.query(
-          "UPDATE employee SET role_id = ? WHERE id = ?",
+        const [employee] = await db.query(
+          "SELECT last_name FROM employee WHERE id = ?",
           {
-            replacements: [answers.role_id, answers.employee_id],
-            type: db.QueryTypes.UPDATE,
+            replacements: [answers.employee_id],
+            type: db.QueryTypes.SELECT,
           }
         );
-        console.log("Employee role updated!");
+
+        if (!employee) {
+          console.log("Employee not found");
+          return start();
+        }
+
+        await db.query("UPDATE employee SET role_id = ? WHERE id = ?", {
+          replacements: [answers.role_id, answers.employee_id],
+          type: db.QueryTypes.UPDATE,
+        });
+
+        console.log(`${employee.last_name}'s role updated!`);
         start();
       } catch (error) {
         console.log(error);
