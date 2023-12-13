@@ -354,7 +354,13 @@ const start = () => {
         default:
           process.exit();
       }
+    })
+    .catch((error) => {
+      console.log(error);
+      return start(); // Ensure you return the recursive call
     });
 };
 
 start();
+
+module.exports = { viewAllEmployees, addEmployee, updateEmployeeRole, viewAllRoles, addRole, viewAllDepartments, addDepartment, start };
