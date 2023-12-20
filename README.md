@@ -78,7 +78,7 @@
 8. Quitting the Program:
     When done, choose "Quit" to exit the program gracefully.
 
-To watch a complete video walkthrough of this program click [Here!](https://drive.google.com/file/d/1uosibd4nUfEMOCqgyYUMSJP29e6SRoVh/view?usp=drive_link)
+To watch a complete video walkthrough of this program click [Here!](https://drive.google.com/file/d/1uosibd4nUfEMOCqgyYUMSJP29e6SRoVh/view?usp=sharing)
 
   ## Contributing
   None
